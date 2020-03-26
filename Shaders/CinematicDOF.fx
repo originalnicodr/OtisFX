@@ -1,3 +1,5 @@
+//CineDOF with anamorphic lines orientation, modified by originalnicodr. Most credits go to Frans.
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Cinematic Depth of Field shader, using scatter-as-gather for ReShade 3.x+
@@ -278,6 +280,42 @@ namespace CinematicDOF
 		ui_tooltip = "The alignment factor for the anamorphic deformation. 0.0 means you get evenly rotated\nellipses around the center of the screen, 1.0 means all bokeh highlights are\naligned vertically.";
 		ui_step = 0.01;
 	> = 0.0;
+
+
+
+	uniform bool  HighlightAnamorphicAlignmentAngleOn<
+		ui_category = "Highlight tweaking, anamorphism";
+		ui_label = "Change Anamorphic Alignment Factor to work as an angle modifier";
+		ui_tooltip = "If this is on it changes the Anamorphic aligment factor to work as an angle modifier";
+	> = false;
+
+	uniform float Test1 <
+		ui_category = "Highlight tweaking, anamorphism";
+		ui_label="Experimental Value 1";
+		ui_type = "drag";
+		ui_min = 0.00; ui_max = 10.00;
+		ui_tooltip = "Seems to expand the width of the lines";
+		ui_step = 0.01;
+	> = 0.0;
+
+	uniform float Test2 <
+		ui_category = "Highlight tweaking, anamorphism";
+		ui_label="Experimental Value 2";
+		ui_type = "drag";
+		ui_min = 0.00; ui_max = 10.00;
+		ui_tooltip = "Seems to expand the length of the lines";
+		ui_step = 0.01;
+	> = 1;
+
+	uniform float Test3 <
+		ui_category = "Highlight tweaking, anamorphism";
+		ui_label="Experimental Value 3";
+		ui_type = "drag";
+		ui_min = 0.00; ui_max = 10.00;
+		ui_tooltip = "Seems to expand the length of the lines";
+		ui_step = 0.01;
+	> = 0.0;
+
 	uniform float HighlightGainFarPlane <
 		ui_category = "Highlight tweaking, far plane";
 #if __RESHADE_FXC__		// Freestyle
@@ -478,7 +516,7 @@ namespace CinematicDOF
 	float4 CalculateAnamorphicFactor(float2 pixelVector)
 	{
 		float normalizedFactor = lerp(1, HighlightAnamorphicFactor, lerp(length(pixelVector * 2), 1, HighlightAnamorphicSpreadFactor));
-		return float4(0, 1 + (1-normalizedFactor), normalizedFactor, 0);
+		return float4(Test1, (1 + (1-normalizedFactor))*Test2, normalizedFactor, Test3);
 	}
 	
 	// Calculates a rotation matrix for the current pixel specified in texcoord, which can be used to rotate the bokeh shape to match
@@ -494,6 +532,11 @@ namespace CinematicDOF
 		// calculate the angle between the pixelvector and the ref vector and grab the sin/cos for that angle for the rotation matrix.
 		sincos(atan2(pixelVector.y, pixelVector.x) - atan2(refVector.y, refVector.x), sincosFactor.x, sincosFactor.y);
 		return float2x2(sincosFactor.y, sincosFactor.x, -sincosFactor.x, sincosFactor.y);
+	}
+
+	float2x2 rotationmatrixline(){
+		float a=radians(HighlightAnamorphicAlignmentFactor*360);
+		return float2x2(cos(a),sin(a),-sin(a),cos(a));
 	}
 	
 	float2 MorphPointOffsetWithAnamorphicDeltas(float2 pointOffset, float4 anamorphicFactors, float2x2 anamorphicRotationMatrix)
@@ -669,7 +712,7 @@ namespace CinematicDOF
 				sincos(angle, pointOffset.y, pointOffset.x);
 				// now transform the offset vector with the anamorphic factors and rotate it accordingly to the rotation matrix, so we get a nice
 				// bending around the center of the screen.
-				pointOffset = MorphPointOffsetWithAnamorphicDeltas(pointOffset, anamorphicFactors, anamorphicRotationMatrix);
+				pointOffset = HighlightAnamorphicAlignmentAngleOn ? MorphPointOffsetWithAnamorphicDeltas(pointOffset, anamorphicFactors, rotationmatrixline()) : MorphPointOffsetWithAnamorphicDeltas(pointOffset, anamorphicFactors, anamorphicRotationMatrix);
 				float4 tapCoords = float4(blurInfo.texcoord + (pointOffset * currentRingRadiusCoords), 0, 0);
 				float4 tap = tex2Dlod(source, tapCoords);
 				// r contains blurred CoC, g contains original CoC. Original can be negative
@@ -748,7 +791,7 @@ namespace CinematicDOF
 				sincos(angle, pointOffset.y, pointOffset.x);
 				// now transform the offset vector with the anamorphic factors and rotate it accordingly to the rotation matrix, so we get a nice
 				// bending around the center of the screen.
-				pointOffset = MorphPointOffsetWithAnamorphicDeltas(pointOffset, anamorphicFactors, anamorphicRotationMatrix);
+				pointOffset = HighlightAnamorphicAlignmentAngleOn ? MorphPointOffsetWithAnamorphicDeltas(pointOffset, anamorphicFactors, rotationmatrixline()) : MorphPointOffsetWithAnamorphicDeltas(pointOffset, anamorphicFactors, anamorphicRotationMatrix);
 				float4 tapCoords = float4(blurInfo.texcoord + (pointOffset * currentRingRadiusCoords), 0, 0);
 				float sampleRadius = tex2Dlod(SamplerCDCoC, tapCoords).r;
 				float4 tap = tex2Dlod(source, tapCoords);
